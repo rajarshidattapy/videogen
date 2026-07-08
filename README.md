@@ -1,7 +1,7 @@
 
 # AI Viral Video Generator
 
-A Streamlit app that turns a topic into a ready-to-post short video: research →
+An AI agent that turns a topic into a ready-to-post short video: research →
 script (with human review) → voiceover → avatar video.
 
 This is the Python/Streamlit rewrite of the original TypeScript CLI (kept for
