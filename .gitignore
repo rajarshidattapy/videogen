@@ -1,0 +1,16 @@
+.venv/
+.claude/
+node_modules/
+legacy/
+docs/
+package-lock.json
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# App runtime artifacts
+.env
+outputs/
+logs/

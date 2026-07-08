@@ -1,0 +1,7 @@
+streamlit>=1.59.1
+openai-agents>=0.18.0
+composio>=0.17.1
+pydantic>=2.13.4
+pydantic-settings>=2.14.2
+python-dotenv>=1.2.2
+requests>=2.34.2
