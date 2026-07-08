@@ -1,16 +1,16 @@
 """Streamlit UI for the AI viral video pipeline.
 
 This module only renders UI, wires up buttons, and holds session state.
-All business logic lives in agents/ and services/.
+All business logic lives in stages/ and services/.
 """
 
 import streamlit as st
 
-from agents.audio import run_audio_stage
-from agents.research import run_research_stage
-from agents.review import approve_script, reject_script, validate_script
-from agents.script import run_script_stage
-from agents.video import run_video_stage
+from stages.audio import run_audio_stage
+from stages.research import run_research_stage
+from stages.review import approve_script, reject_script, validate_script
+from stages.script import run_script_stage
+from stages.video import run_video_stage
 from config import get_settings
 from models.state import PipelineState, PipelineStatus
 

@@ -15,8 +15,6 @@ from utils.prompts import (
     youtube_scout_instructions,
 )
 
-logger = get_logger()
-
 
 def _discover_youtube(topic: str) -> list[VideoReference]:
     settings = get_settings()
@@ -31,7 +29,7 @@ def _discover_youtube(topic: str) -> list[VideoReference]:
         try:
             videos.append(VideoReference(**item))
         except Exception:
-            logger.warning("Skipping malformed YouTube item: %s", item)
+            get_logger().warning("Skipping malformed YouTube item: %s", item)
     return videos
 
 
@@ -61,7 +59,7 @@ def _discover_twitter(topic: str) -> list[TwitterInsight]:
         try:
             insights.append(TwitterInsight(**item))
         except Exception:
-            logger.warning("Skipping malformed Twitter item: %s", item)
+            get_logger().warning("Skipping malformed Twitter item: %s", item)
     return insights
 
 

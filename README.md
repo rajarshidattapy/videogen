@@ -23,7 +23,7 @@ OpenAI Agent; HeyGen is called directly through Composio's HTTP proxy.
 ```
 app.py                  Streamlit UI - rendering, buttons, session state only
 config.py               Environment/settings loading and validation
-agents/                 Pipeline stage orchestration (no UI, no Streamlit imports)
+stages/                 Pipeline stage orchestration (no UI, no Streamlit imports)
   research.py
   script.py
   review.py
