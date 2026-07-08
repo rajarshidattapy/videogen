@@ -4,7 +4,7 @@ No UI logic - pure business logic, returning a ResearchData model.
 """
 
 from config import get_settings
-from models.state import ResearchData, TwitterInsight, VideoReference
+from state import ResearchData, TwitterInsight, VideoReference
 from services.composio_client import create_toolkit_session
 from services.openai_client import build_agent, run_agent
 from utils.helpers import days_ago_iso, extract_json_array, extract_key_terms

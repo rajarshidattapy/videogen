@@ -1,6 +1,6 @@
 """Prompt and instruction builders for each LLM agent, kept out of the orchestration code."""
 
-from models.state import ResearchData
+from state import ResearchData
 
 
 def youtube_scout_instructions(topic: str) -> str:

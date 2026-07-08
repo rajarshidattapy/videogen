@@ -3,7 +3,7 @@
 No Streamlit code.
 """
 
-from models.state import PipelineState
+from state import PipelineState
 from services.openai_client import build_agent, run_agent
 from utils.helpers import strip_code_block
 from utils.logger import stage

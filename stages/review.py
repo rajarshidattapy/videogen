@@ -3,7 +3,7 @@
 Pure state transitions - Streamlit only wires buttons to these functions.
 """
 
-from models.state import PipelineState, PipelineStatus
+from state import PipelineState, PipelineStatus
 
 
 def validate_script(script: str | None) -> tuple[bool, str | None]:

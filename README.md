@@ -34,11 +34,10 @@ services/                Vendor integrations
   openai_client.py       OpenAI Agents SDK helpers (build agent, run agent)
   elevenlabs_client.py   ElevenLabs speech generation
   heygen_client.py       HeyGen video generation, polling, download
-models/state.py          Pydantic models: ResearchData, PipelineState, ...
+state.py                 Pydantic models: ResearchData, PipelineState, ...
 utils/                   Prompts, logging, small pure helpers
 outputs/                 Generated audio/video (gitignored)
 logs/                    App logs (gitignored)
-tests/                   Unit tests for pure logic (helpers, models)
 ```
 
 ## Setup
@@ -67,11 +66,42 @@ tests/                   Unit tests for pure logic (helpers, models)
    streamlit run app.py
    ```
 
-## Testing
+## Deploying to Streamlit Community Cloud
 
-```bash
-pytest
-```
+1. Push this repo to GitHub, then create a new app at
+   [share.streamlit.io](https://share.streamlit.io) pointing at `app.py`.
 
-Tests cover pure logic only (JSON extraction, prompt helpers, state models) -
-the pipeline stages themselves call live external APIs and are not mocked.
+2. Python version: the repo pins `3.12` via `.python-version`. Community Cloud
+   reads this automatically; no extra setting is needed.
+
+3. Secrets: don't commit `.env`. Instead, open the app's **Settings → Secrets**
+   in the Community Cloud dashboard and paste the same keys from
+   `.env.example` in TOML form, e.g.:
+
+   ```toml
+   OPENAI_API_KEY = "sk-..."
+   COMPOSIO_API_KEY = "..."
+   COMPOSIO_USER_ID = "..."
+   YOUTUBE_AUTH_CONFIG_ID = "..."
+   TWITTER_AUTH_CONFIG_ID = "..."
+   EXA_AUTH_CONFIG_ID = "..."
+   ELEVENLABS_AUTH_CONFIG_ID = "..."
+   HEYGEN_AUTH_CONFIG_ID = "..."
+   ```
+
+   `app.py` bridges `st.secrets` into environment variables on startup, so
+   `config.py` picks them up exactly like a local `.env` file.
+
+4. Storage is ephemeral: files written to `outputs/` and `logs/` survive for the
+   life of the running container but are wiped on redeploy or reboot. That's
+   fine for a single generate-review-download session; don't rely on it as
+   permanent storage.
+
+5. Video generation blocks the script run for the full HeyGen polling window
+   (up to ~10 minutes by default). This is expected - the UI shows a spinner
+   for the duration; it isn't a hang.
+
+6. This app has no multi-tenant isolation: every visitor shares the same
+   Composio user (and therefore the same connected YouTube/Twitter/ElevenLabs/
+   HeyGen accounts). That's fine for a personal deployment; don't expose it
+   publicly as a multi-user product without adding per-user auth.

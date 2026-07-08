@@ -14,3 +14,4 @@ __pycache__/
 .env
 outputs/
 logs/
+.streamlit/secrets.toml
