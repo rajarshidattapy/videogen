@@ -84,17 +84,49 @@ def stage_header(number: int, title: str, done: bool, active: bool, blocked: str
 
 
 # --------------------------------------------------------------------------
-# Sidebar - what is actually usable right now
+# Composio status - needed by the pipeline blockers AND the settings view
+# --------------------------------------------------------------------------
+if settings_error:
+    composio_ok, composio_msg = False, "Settings failed to load."
+else:
+    composio_ok, composio_msg = check_composio()
+
+if "view" not in st.session_state:
+    st.session_state.view = "studio"
+
+# --------------------------------------------------------------------------
+# Sidebar - navigation only
 # --------------------------------------------------------------------------
 with st.sidebar:
-    st.header("Service status")
+    st.header("🎬 AI Video Studio")
 
+    if st.session_state.view == "studio":
+        if st.button("⚙️ Settings & connections", use_container_width=True):
+            st.session_state.view = "settings"
+            st.rerun()
+    else:
+        if st.button("← Back to studio", use_container_width=True):
+            st.session_state.view = "studio"
+            st.rerun()
+
+    if not composio_ok and st.session_state.view == "studio":
+        st.warning("Composio not ready - open Settings.")
+
+    if st.button("Reset pipeline", use_container_width=True):
+        st.session_state.pipeline = PipelineState()
+        st.session_state.pop("script_editor", None)
+        st.rerun()
+
+# --------------------------------------------------------------------------
+# Settings view - service status + connections, on its own screen
+# --------------------------------------------------------------------------
+if st.session_state.view == "settings":
+    st.title("⚙️ Settings & connections")
+
+    st.subheader("Service status")
     if settings_error:
         st.error(f"Configuration error: {settings_error}")
-        composio_ok, composio_msg = False, "Settings failed to load."
     else:
-        composio_ok, composio_msg = check_composio()
-
         st.success("OpenAI - key loaded")
         st.success("Sarvam - key loaded")
         (st.success if composio_ok else st.error)(f"Composio - {composio_msg}")
@@ -116,28 +148,20 @@ with st.sidebar:
             st.text(f"Sarvam model:  {settings.sarvam_model} ({settings.sarvam_language})")
             st.text(f"HeyGen avatar: {settings.heygen_avatar_id}")
 
-        if st.button("Reset pipeline"):
-            st.session_state.pipeline = PipelineState()
-            st.session_state.pop("script_editor", None)
-            st.rerun()
+    st.divider()
 
-# --------------------------------------------------------------------------
-# Blockers, computed once and reused by each stage
-# --------------------------------------------------------------------------
-if settings_error:
-    connected: set[str] = set()
-else:
-    try:
+    if settings_error:
+        st.subheader("Connections")
+        st.info("Fix the configuration error above to manage connections.")
+    else:
         from client.connections import TOOLKITS, connected_slugs, start_connection
 
-        connected = connected_slugs()
-    except Exception:
-        connected = set()
+        try:
+            connected = connected_slugs()
+        except Exception:
+            connected = set()
 
-    with st.expander(
-        f"🔌 Connections ({len(connected)}/{len(TOOLKITS)} connected)",
-        expanded=not connected,
-    ):
+        st.subheader(f"Connections ({len(connected)}/{len(TOOLKITS)} connected)")
         st.caption(f"Connecting as Composio user `{settings.composio_user_id}`.")
 
         for toolkit in TOOLKITS:
@@ -174,6 +198,11 @@ else:
 
             st.divider()
 
+    st.stop()
+
+# --------------------------------------------------------------------------
+# Blockers, computed once and reused by each stage (studio view)
+# --------------------------------------------------------------------------
 research_blocker = None if composio_ok else composio_msg
 video_blocker = None
 if not composio_ok:
@@ -222,7 +251,10 @@ with st.container(border=True):
         st.rerun()
 
     if research_blocker:
-        st.info("Research needs Composio. You can still skip ahead and write a script by hand in step 2.")
+        st.info(
+            "Research needs Composio - connect toolkits under ⚙️ Settings & connections. "
+            "You can still skip ahead and write a script by hand in step 2."
+        )
 
     if state.research:
         st.markdown("**AI summary / news**")

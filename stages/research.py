@@ -4,7 +4,7 @@ No UI logic - pure business logic, returning a ResearchData model.
 """
 
 from state import ResearchData, TwitterInsight, VideoReference
-from client.composio_client import get_shared_tools
+from client.composio_client import connected_research_toolkits, get_shared_tools
 from client.openai_client import build_agent, run_agent
 from utils.helpers import days_ago_iso, extract_json_array, extract_key_terms
 from utils.logger import get_logger, stage
@@ -56,11 +56,28 @@ def _discover_twitter(tools, topic: str) -> list[TwitterInsight]:
 
 
 def run_research_stage(topic: str) -> ResearchData:
+    """Runs research on whatever subset of youtube/exa/twitter is connected.
+
+    At least one must be connected; unconnected toolkits are skipped (a session
+    over a toolkit with no auth config 400s), so e.g. YouTube + Exa work without X.
+    """
     with stage("Research"):
-        tools = get_shared_tools()
-        videos = _discover_youtube(tools, topic)
-        trends = _discover_trends(tools, topic)
-        twitter_insights = _discover_twitter(tools, topic)
+        connected = connected_research_toolkits()
+        if not connected:
+            raise ValueError(
+                "Connect at least one of YouTube, Exa, or Twitter/X under Settings to run research."
+            )
+
+        tools = get_shared_tools(connected)
+        get_logger().info("Research running with: %s", ", ".join(connected))
+
+        videos = _discover_youtube(tools, topic) if "youtube" in connected else []
+        trends = (
+            _discover_trends(tools, topic)
+            if "exa" in connected
+            else "Trend research skipped (Exa not connected)."
+        )
+        twitter_insights = _discover_twitter(tools, topic) if "twitter" in connected else []
 
         return ResearchData(
             videos=videos,
