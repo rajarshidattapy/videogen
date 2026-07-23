@@ -4,7 +4,7 @@ No UI logic - pure business logic, returning a ResearchData model.
 """
 
 from state import ResearchData, TwitterInsight, VideoReference
-from client.composio_client import ToolkitSession, get_shared_session
+from client.composio_client import get_shared_tools
 from client.openai_client import build_agent, run_agent
 from utils.helpers import days_ago_iso, extract_json_array, extract_key_terms
 from utils.logger import get_logger, stage
@@ -15,8 +15,8 @@ from utils.prompts import (
 )
 
 
-def _discover_youtube(session: ToolkitSession, topic: str) -> list[VideoReference]:
-    agent = build_agent("YouTube Scout", youtube_scout_instructions(topic), session)
+def _discover_youtube(tools, topic: str) -> list[VideoReference]:
+    agent = build_agent("YouTube Scout", youtube_scout_instructions(topic), tools)
 
     raw_output = run_agent(agent, "Find top 5 viral shorts.")
     items = extract_json_array(raw_output)
@@ -30,18 +30,18 @@ def _discover_youtube(session: ToolkitSession, topic: str) -> list[VideoReferenc
     return videos
 
 
-def _discover_trends(session: ToolkitSession, topic: str) -> str:
+def _discover_trends(tools, topic: str) -> str:
     date_str = days_ago_iso(30)
-    agent = build_agent("Trend Researcher", trend_researcher_instructions(topic, date_str), session)
+    agent = build_agent("Trend Researcher", trend_researcher_instructions(topic, date_str), tools)
 
     raw_output = run_agent(agent, "Find fresh news.")
     return raw_output or "No trends found."
 
 
-def _discover_twitter(session: ToolkitSession, topic: str) -> list[TwitterInsight]:
+def _discover_twitter(tools, topic: str) -> list[TwitterInsight]:
     search_query = extract_key_terms(topic)
     date_str = days_ago_iso(90)
-    agent = build_agent("Twitter Scout", twitter_scout_instructions(search_query, date_str), session)
+    agent = build_agent("Twitter Scout", twitter_scout_instructions(search_query, date_str), tools)
 
     raw_output = run_agent(agent, "Find viral threads.")
     items = extract_json_array(raw_output)
@@ -57,10 +57,10 @@ def _discover_twitter(session: ToolkitSession, topic: str) -> list[TwitterInsigh
 
 def run_research_stage(topic: str) -> ResearchData:
     with stage("Research"):
-        session = get_shared_session()
-        videos = _discover_youtube(session, topic)
-        trends = _discover_trends(session, topic)
-        twitter_insights = _discover_twitter(session, topic)
+        tools = get_shared_tools()
+        videos = _discover_youtube(tools, topic)
+        trends = _discover_trends(tools, topic)
+        twitter_insights = _discover_twitter(tools, topic)
 
         return ResearchData(
             videos=videos,

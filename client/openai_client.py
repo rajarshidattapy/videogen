@@ -1,9 +1,8 @@
-"""OpenAI Agents SDK helpers: building a hosted-MCP-backed Agent and running it."""
+"""OpenAI Agents SDK helpers: building an Agent (optionally with Composio tools) and running it."""
 
-from agents import Agent, HostedMCPTool, Runner, set_default_openai_key
+from agents import Agent, Runner, set_default_openai_key
 
 from config import get_settings
-from client.composio_client import ToolkitSession
 
 _configured_key: str | None = None
 
@@ -22,23 +21,17 @@ def _configure_key() -> None:
         _configured_key = key
 
 
-def build_hosted_mcp_tool(session: ToolkitSession, server_label: str = "tool_router") -> HostedMCPTool:
-    return HostedMCPTool(
-        tool_config={
-            "type": "mcp",
-            "server_label": server_label,
-            "server_url": session.url,
-            "headers": session.headers,
-            "require_approval": "never",
-        }
-    )
-
-
-def build_agent(name: str, instructions: str, session: ToolkitSession | None = None) -> Agent:
+def build_agent(name: str, instructions: str, tools=None) -> Agent:
+    """Builds an Agent. `tools` is a Composio provider tool collection (from
+    get_shared_tools()) or None for a tool-less agent like the scriptwriter."""
     settings = get_settings()
     _configure_key()
-    tools = [build_hosted_mcp_tool(session)] if session else []
-    return Agent(name=name, instructions=instructions, tools=tools, model=settings.openai_model)
+    return Agent(
+        name=name,
+        instructions=instructions,
+        tools=list(tools) if tools else [],
+        model=settings.openai_model,
+    )
 
 
 def run_agent(agent: Agent, prompt: str) -> str:
