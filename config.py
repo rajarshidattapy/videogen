@@ -11,12 +11,13 @@ BASE_DIR = Path(__file__).resolve().parent
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # OpenAI
-    openai_api_key: str = Field(validation_alias="OPENAI_API_KEY")
+    # OpenAI. min_length=1 on the required keys so a blank value in .env fails at
+    # startup with a clear message, instead of a 401 halfway through the pipeline.
+    openai_api_key: str = Field(min_length=1, validation_alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o", validation_alias="OPENAI_MODEL")
 
     # Composio
-    composio_api_key: str = Field(validation_alias="COMPOSIO_API_KEY")
+    composio_api_key: str = Field(min_length=1, validation_alias="COMPOSIO_API_KEY")
     composio_user_id: str = Field(default="default-user", validation_alias="COMPOSIO_USER_ID")
 
     # Auth config IDs (from the Composio dashboard) - optional, toolkits fall back
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
     heygen_auth_config_id: str | None = Field(default=None, validation_alias="HEYGEN_AUTH_CONFIG_ID")
 
     # Sarvam AI (text-to-speech, called directly - not via Composio)
-    sarvam_api_key: str = Field(validation_alias="SARVAM_API_KEY")
+    sarvam_api_key: str = Field(min_length=1, validation_alias="SARVAM_API_KEY")
     sarvam_model: str = Field(default="bulbul:v2", validation_alias="SARVAM_MODEL")
     sarvam_speaker: str = Field(default="anushka", validation_alias="SARVAM_SPEAKER")
     sarvam_language: str = Field(default="en-IN", validation_alias="SARVAM_LANGUAGE")
