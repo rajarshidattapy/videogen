@@ -7,8 +7,8 @@ from state import PipelineState, PipelineStatus
 
 
 def validate_script(script: str | None) -> tuple[bool, str | None]:
-    if not script or script.startswith("Error:"):
-        return False, "Script generation failed."
+    if not script or not script.strip() or script.startswith("Error:"):
+        return False, "Script is empty or failed to generate."
     return True, None
 
 

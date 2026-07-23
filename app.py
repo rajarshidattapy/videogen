@@ -1,7 +1,7 @@
 """Streamlit UI for the AI viral video pipeline.
 
 This module only renders UI, wires up buttons, and holds session state.
-All business logic lives in stages/ and services/.
+All business logic lives in stages/ and client/.
 """
 
 import os
@@ -32,6 +32,13 @@ if "pipeline" not in st.session_state:
     st.session_state.pipeline = PipelineState()
 state: PipelineState = st.session_state.pipeline
 
+try:
+    settings = get_settings()
+    settings_error = None
+except Exception as exc:
+    settings = None
+    settings_error = str(exc)
+
 
 def run_stage_safely(stage_name: str, fn, *args) -> object | None:
     try:
@@ -43,179 +50,281 @@ def run_stage_safely(stage_name: str, fn, *args) -> object | None:
         return None
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def check_composio() -> tuple[bool, str]:
+    """Live credential check, cached for 5 minutes. Research and video both need this."""
+    try:
+        from client.composio_client import get_composio_client
+
+        client = get_composio_client()
+        accounts = client.connected_accounts.list(user_ids=[get_settings().composio_user_id])
+        slugs = sorted({item.toolkit.slug.upper() for item in accounts.items})
+        if not slugs:
+            return False, "Key valid, but no toolkits connected for this user."
+        return True, "Connected: " + ", ".join(slugs)
+    except Exception as exc:
+        message = str(exc)
+        if "401" in message or "InvalidAPIKey" in message:
+            return False, "Invalid COMPOSIO_API_KEY (401)."
+        return False, f"{type(exc).__name__}: {message[:120]}"
+
+
+def stage_header(number: int, title: str, done: bool, active: bool, blocked: str | None) -> None:
+    if done:
+        icon = "✅"
+    elif active:
+        icon = "⏳"
+    elif blocked:
+        icon = "🔒"
+    else:
+        icon = "⬜"
+    st.markdown(f"#### {icon} {number}. {title}")
+    if blocked and not done:
+        st.caption(f"Blocked: {blocked}")
+
+
 # --------------------------------------------------------------------------
-# Sidebar
+# Sidebar - what is actually usable right now
 # --------------------------------------------------------------------------
 with st.sidebar:
-    st.header("Settings")
+    st.header("Service status")
 
-    try:
-        settings = get_settings()
-        settings_error = None
-    except Exception as exc:
-        settings = None
-        settings_error = str(exc)
-
-    st.subheader("API status")
     if settings_error:
         st.error(f"Configuration error: {settings_error}")
+        composio_ok, composio_msg = False, "Settings failed to load."
     else:
-        st.success("OpenAI API key loaded")
-        st.success("Composio API key loaded")
-        st.success("Sarvam API key loaded")
-        for label, value in [
-            ("YouTube auth config", settings.youtube_auth_config_id),
-            ("Twitter auth config", settings.twitter_auth_config_id),
-            ("Exa auth config", settings.exa_auth_config_id),
-            ("HeyGen auth config", settings.heygen_auth_config_id),
-        ]:
-            (st.success if value else st.warning)(
-                f"{label}: {'configured' if value else 'using default connected account'}"
-            )
+        composio_ok, composio_msg = check_composio()
+
+        st.success("OpenAI - key loaded")
+        st.success("Sarvam - key loaded")
+        (st.success if composio_ok else st.error)(f"Composio - {composio_msg}")
 
         if settings.public_base_url:
-            st.success(f"Public URL: {settings.public_base_url}")
+            st.success(f"Public URL - {settings.public_base_url}")
         else:
-            st.warning("PUBLIC_BASE_URL unset - audio works, video generation will fail")
+            st.warning("PUBLIC_BASE_URL unset - video stage unavailable")
 
-    st.subheader("Provider")
-    st.selectbox("LLM model", options=[settings.openai_model if settings else "gpt-4o"], disabled=True)
+        if st.button("Re-check services"):
+            check_composio.clear()
+            st.rerun()
 
-    if settings:
-        with st.expander("Advanced"):
+        with st.expander("Configuration"):
+            st.text(f"OpenAI model:  {settings.openai_model}")
             st.text(f"Composio user: {settings.composio_user_id}")
-            st.text(f"Sarvam voice: {settings.sarvam_speaker} ({settings.sarvam_model}, {settings.sarvam_language})")
+            st.text(f"Sarvam voice:  {settings.sarvam_speaker}")
+            st.text(f"Sarvam model:  {settings.sarvam_model} ({settings.sarvam_language})")
             st.text(f"HeyGen avatar: {settings.heygen_avatar_id}")
 
+        if st.button("Reset pipeline"):
+            st.session_state.pipeline = PipelineState()
+            st.session_state.pop("script_editor", None)
+            st.rerun()
+
 # --------------------------------------------------------------------------
-# Main page - topic input
+# Blockers, computed once and reused by each stage
 # --------------------------------------------------------------------------
+research_blocker = None if composio_ok else composio_msg
+video_blocker = None
+if not composio_ok:
+    video_blocker = composio_msg
+elif settings and not settings.public_base_url:
+    video_blocker = "PUBLIC_BASE_URL is unset - HeyGen cannot fetch audio from localhost."
+
 st.title("🎬 AI Viral Video Generator")
-
-topic = st.text_input("Topic", value=state.topic or "Claude code for development in 2026")
-
-if st.button("Generate", type="primary", disabled=settings_error is not None):
-    state.topic = topic
-    state.status = PipelineStatus.RESEARCHING
-    research = run_stage_safely("Research", run_research_stage, topic)
-    if research is not None:
-        state.research = research
-        state.status = PipelineStatus.SCRIPTING
-        script = run_stage_safely("Script", run_script_stage, state)
-        if script is not None:
-            state.script = script
-            state.approved = False
-            state.status = PipelineStatus.AWAITING_REVIEW
-
-# --------------------------------------------------------------------------
-# Progress indicator
-# --------------------------------------------------------------------------
-def progress_glyph(done: bool, active: bool) -> str:
-    if done:
-        return "✓"
-    if active:
-        return "⏳"
-    return "⬜"
-
 
 st.markdown(
     " &nbsp;→&nbsp; ".join(
         [
-            f"{progress_glyph(state.research is not None, state.status == PipelineStatus.RESEARCHING)} Research",
-            f"{progress_glyph(state.script is not None, state.status == PipelineStatus.SCRIPTING)} Script",
-            f"{progress_glyph(state.approved, state.status == PipelineStatus.AWAITING_REVIEW)} Review",
-            f"{progress_glyph(state.audio_path is not None, state.status == PipelineStatus.GENERATING_AUDIO)} Voice",
-            f"{progress_glyph(state.video_path is not None, state.status == PipelineStatus.GENERATING_VIDEO)} Video",
+            f"{'✅' if state.research else '⬜'} Research",
+            f"{'✅' if state.script else '⬜'} Script",
+            f"{'✅' if state.approved else '⬜'} Review",
+            f"{'✅' if state.audio_path else '⬜'} Voice",
+            f"{'✅' if state.video_path else '⬜'} Video",
         ]
     )
 )
 
 if state.errors:
-    with st.expander("Errors", expanded=True):
+    with st.expander(f"Errors ({len(state.errors)})", expanded=True):
         for err in state.errors:
             st.error(err)
+        if st.button("Clear errors"):
+            state.errors.clear()
+            st.rerun()
 
 # --------------------------------------------------------------------------
-# Research section
+# 1. Research
 # --------------------------------------------------------------------------
-if state.research:
-    with st.expander("Research", expanded=False):
+with st.container(border=True):
+    stage_header(1, "Research", bool(state.research), state.status == PipelineStatus.RESEARCHING, research_blocker)
+    st.caption("YouTube, Twitter/X, and Exa via Composio.")
+
+    topic = st.text_input("Topic", value=state.topic or "Claude code for development in 2026")
+
+    if st.button("Run research", type="primary", disabled=bool(research_blocker or settings_error)):
+        state.topic = topic
+        state.status = PipelineStatus.RESEARCHING
+        research = run_stage_safely("Research", run_research_stage, topic)
+        if research is not None:
+            state.research = research
+            state.status = PipelineStatus.RESEARCHED
+        st.rerun()
+
+    if research_blocker:
+        st.info("Research needs Composio. You can still skip ahead and write a script by hand in step 2.")
+
+    if state.research:
         st.markdown("**AI summary / news**")
         st.write(state.research.trends)
 
-        st.markdown("**YouTube videos**")
-        for video in state.research.videos:
-            st.markdown(f"- [{video.title}]({video.url})")
+        if state.research.videos:
+            st.markdown("**YouTube videos**")
+            for video in state.research.videos:
+                st.markdown(f"- [{video.title}]({video.url})")
 
-        st.markdown("**Twitter/X insights**")
-        for tweet in state.research.twitter_insights:
-            st.markdown(f"- {tweet.text} ({tweet.likes} likes) - [link]({tweet.url})")
+        if state.research.twitter_insights:
+            st.markdown("**Twitter/X insights**")
+            for tweet in state.research.twitter_insights:
+                st.markdown(f"- {tweet.text} ({tweet.likes} likes) - [link]({tweet.url})")
 
 # --------------------------------------------------------------------------
-# Script section
+# 2. Script
 # --------------------------------------------------------------------------
-if state.script is not None:
-    st.subheader("Script")
-    edited_script = st.text_area("Script text", value=state.script, height=200, key="script_editor")
+with st.container(border=True):
+    stage_header(2, "Script", state.script is not None, state.status == PipelineStatus.SCRIPTING, None)
+    st.caption("Generated by OpenAI from the research, or written by hand.")
 
-    col1, col2, col3 = st.columns(3)
+    col_gen, col_manual = st.columns(2)
 
-    with col1:
-        feedback = st.text_input("Feedback for regeneration", value="Make the hook punchier")
-        if st.button("Regenerate"):
-            reject_script(state, feedback)
+    with col_gen:
+        if st.button(
+            "Generate from research",
+            disabled=state.research is None or bool(settings_error),
+            help=None if state.research else "Run research first",
+        ):
             state.status = PipelineStatus.SCRIPTING
-            new_script = run_stage_safely("Script", run_script_stage, state)
-            if new_script is not None:
-                state.script = new_script
+            script = run_stage_safely("Script", run_script_stage, state)
+            if script is not None:
+                state.script = script
+                state.approved = False
                 state.status = PipelineStatus.AWAITING_REVIEW
+                # The editor is a keyed widget, so its old text survives a rerun.
+                st.session_state.pop("script_editor", None)
+            st.rerun()
+
+    with col_manual:
+        if st.button("Write manually", help="Skip research and paste your own script"):
+            state.script = state.script or ""
+            state.approved = False
+            state.status = PipelineStatus.AWAITING_REVIEW
+            st.rerun()
+
+    if state.script is None:
+        st.info("No script yet.")
+    else:
+        state.script = st.text_area("Script text", value=state.script, height=200, key="script_editor")
+        st.caption(f"{len(state.script)} characters, ~{len(state.script.split())} words")
+
+# --------------------------------------------------------------------------
+# 3. Review
+# --------------------------------------------------------------------------
+with st.container(border=True):
+    stage_header(
+        3,
+        "Review",
+        state.approved,
+        state.status == PipelineStatus.AWAITING_REVIEW,
+        None if state.script is not None else "Needs a script.",
+    )
+    st.caption("Approve the script to unlock voice generation.")
+
+    if state.script is None:
+        st.info("Nothing to review yet.")
+    else:
+        feedback = st.text_input("Feedback for regeneration", value="Make the hook punchier")
+        col_regen, col_approve = st.columns(2)
+
+        with col_regen:
+            if st.button(
+                "Regenerate with feedback",
+                disabled=state.research is None,
+                help=None if state.research else "Regeneration needs research data",
+            ):
+                reject_script(state, feedback)
+                state.status = PipelineStatus.SCRIPTING
+                new_script = run_stage_safely("Script", run_script_stage, state)
+                if new_script is not None:
+                    state.script = new_script
+                    state.status = PipelineStatus.AWAITING_REVIEW
+                    st.session_state.pop("script_editor", None)
                 st.rerun()
 
-    with col2:
-        if st.button("Save"):
-            state.script = edited_script
-            st.success("Script saved.")
+        with col_approve:
+            if st.button("Approve", type="primary"):
+                is_valid, error = validate_script(state.script)
+                if not is_valid:
+                    st.error(error)
+                else:
+                    approve_script(state)
+                    st.rerun()
 
-    with col3:
-        if st.button("Approve", type="primary"):
-            is_valid, error = validate_script(edited_script)
-            if not is_valid:
-                st.error(error)
-            else:
-                state.script = edited_script
-                approve_script(state)
-                st.success("Script approved!")
+        if state.approved:
+            st.success("Script approved.")
 
 # --------------------------------------------------------------------------
-# Audio section
+# 4. Voice
 # --------------------------------------------------------------------------
-if state.approved:
-    st.subheader("Audio")
+with st.container(border=True):
+    stage_header(
+        4,
+        "Voice",
+        state.audio_path is not None,
+        state.status == PipelineStatus.GENERATING_AUDIO,
+        None if state.approved else "Approve a script first.",
+    )
+    st.caption(
+        f"Sarvam AI - {settings.sarvam_speaker} ({settings.sarvam_model})" if settings else "Sarvam AI"
+    )
 
-    if st.button("Generate Voice"):
-        state.status = PipelineStatus.GENERATING_AUDIO
-        result = run_stage_safely("Audio", run_audio_stage, state.script)
-        if result is not None:
-            state.audio_url, state.audio_path = result
-            state.status = PipelineStatus.AUDIO_READY
+    if not state.approved:
+        st.info("Approve a script to generate the voiceover.")
+    else:
+        if st.button("Generate voice", type="primary"):
+            state.status = PipelineStatus.GENERATING_AUDIO
+            result = run_stage_safely("Audio", run_audio_stage, state.script)
+            if result is not None:
+                state.audio_url, state.audio_path = result
+                state.status = PipelineStatus.AUDIO_READY
+            st.rerun()
 
     if state.audio_path:
         st.audio(state.audio_path)
         with open(state.audio_path, "rb") as audio_file:
             st.download_button("Download audio", audio_file, file_name="speech.mp3")
+        if state.audio_url:
+            st.caption(f"Public URL for HeyGen: {state.audio_url}")
+        else:
+            st.warning("Audio is local only - no PUBLIC_BASE_URL, so HeyGen cannot fetch it.")
 
 # --------------------------------------------------------------------------
-# Video section
+# 5. Video
 # --------------------------------------------------------------------------
-if state.audio_path:
-    st.subheader("Video")
+with st.container(border=True):
+    blocker = video_blocker or (None if state.audio_path else "Generate the voiceover first.")
+    stage_header(5, "Video", state.video_path is not None, state.status == PipelineStatus.GENERATING_VIDEO, blocker)
+    st.caption("HeyGen avatar video. Only works on the deployed app.")
 
-    if st.button("Generate Video"):
+    if blocker:
+        st.info(blocker)
+
+    if st.button("Generate video", type="primary", disabled=bool(blocker)):
         state.status = PipelineStatus.GENERATING_VIDEO
+        st.warning("HeyGen renders can take several minutes. Leave this tab open.")
         result = run_stage_safely("Video", run_video_stage, state.audio_url)
         if result is not None:
             _video_url, state.video_path = result
             state.status = PipelineStatus.DONE
+        st.rerun()
 
     if state.video_path:
         st.video(state.video_path)
