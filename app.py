@@ -23,7 +23,7 @@ from stages.research import run_research_stage
 from stages.review import approve_script, reject_script, validate_script
 from stages.script import run_script_stage
 from stages.video import run_video_stage
-from config import get_settings
+from config import get_settings, reload_settings
 from state import PipelineState, PipelineStatus
 
 st.set_page_config(page_title="AI Viral Video Generator", page_icon="🎬", layout="wide")
@@ -104,7 +104,8 @@ with st.sidebar:
         else:
             st.warning("PUBLIC_BASE_URL unset - video stage unavailable")
 
-        if st.button("Re-check services"):
+        if st.button("Re-check services", help="Re-reads .env and re-tests every credential"):
+            reload_settings()
             check_composio.clear()
             st.rerun()
 
@@ -123,6 +124,56 @@ with st.sidebar:
 # --------------------------------------------------------------------------
 # Blockers, computed once and reused by each stage
 # --------------------------------------------------------------------------
+if settings_error:
+    connected: set[str] = set()
+else:
+    try:
+        from client.connections import TOOLKITS, connected_slugs, start_connection
+
+        connected = connected_slugs()
+    except Exception:
+        connected = set()
+
+    with st.expander(
+        f"🔌 Connections ({len(connected)}/{len(TOOLKITS)} connected)",
+        expanded=not connected,
+    ):
+        st.caption(f"Connecting as Composio user `{settings.composio_user_id}`.")
+
+        for toolkit in TOOLKITS:
+            is_connected = toolkit.slug in connected
+            st.markdown(f"**{'✅' if is_connected else '⬜'} {toolkit.label}** - {toolkit.hint}")
+
+            if is_connected:
+                continue
+
+            api_key = client_id = client_secret = ""
+            if toolkit.scheme == "api_key":
+                api_key = st.text_input(
+                    f"{toolkit.label} API key", type="password", key=f"key_{toolkit.slug}"
+                )
+            elif toolkit.scheme == "oauth_custom":
+                col_id, col_secret = st.columns(2)
+                client_id = col_id.text_input(f"{toolkit.label} client ID", key=f"cid_{toolkit.slug}")
+                client_secret = col_secret.text_input(
+                    f"{toolkit.label} client secret", type="password", key=f"sec_{toolkit.slug}"
+                )
+
+            if st.button(f"Connect {toolkit.label}", key=f"conn_{toolkit.slug}"):
+                try:
+                    url = start_connection(toolkit, api_key, client_id, client_secret)
+                except Exception as exc:
+                    st.error(f"{toolkit.label}: {exc}")
+                else:
+                    if url:
+                        st.link_button(f"Authorize {toolkit.label}", url, type="primary")
+                        st.caption("Authorize in the new tab, then press Re-check services.")
+                    else:
+                        st.success(f"{toolkit.label} connected.")
+                        check_composio.clear()
+
+            st.divider()
+
 research_blocker = None if composio_ok else composio_msg
 video_blocker = None
 if not composio_ok:

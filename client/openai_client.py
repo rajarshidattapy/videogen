@@ -5,16 +5,21 @@ from agents import Agent, HostedMCPTool, Runner, set_default_openai_key
 from config import get_settings
 from client.composio_client import ToolkitSession
 
-_key_configured = False
+_configured_key: str | None = None
 
 
 def _configure_key() -> None:
     """Hands the key to the Agents SDK, which reads os.environ and would otherwise
-    miss a key that pydantic-settings loaded from .env into Settings only."""
-    global _key_configured
-    if not _key_configured:
-        set_default_openai_key(get_settings().openai_api_key, use_for_tracing=True)
-        _key_configured = True
+    miss a key that pydantic-settings loaded from .env into Settings only.
+
+    Tracks the key itself rather than a done-flag, so reload_settings() picks up an
+    edited .env instead of leaving the SDK on the key read at process start.
+    """
+    global _configured_key
+    key = get_settings().openai_api_key
+    if key != _configured_key:
+        set_default_openai_key(key, use_for_tracing=True)
+        _configured_key = key
 
 
 def build_hosted_mcp_tool(session: ToolkitSession, server_label: str = "tool_router") -> HostedMCPTool:

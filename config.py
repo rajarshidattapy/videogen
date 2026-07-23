@@ -71,3 +71,14 @@ def get_settings() -> Settings:
         _settings = Settings()
         _settings.ensure_output_dirs()
     return _settings
+
+
+def reload_settings() -> Settings:
+    """Drops the cached Settings so an edited .env takes effect without restarting.
+
+    Streamlit reruns the script but keeps imported modules alive, so the singleton
+    above would otherwise serve the keys read at process start forever.
+    """
+    global _settings
+    _settings = None
+    return get_settings()
