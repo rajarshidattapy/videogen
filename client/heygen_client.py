@@ -7,7 +7,7 @@ from typing import Any
 import requests
 
 from config import get_settings
-from services.composio_client import get_composio_client, get_heygen_connection_id
+from client.composio_client import get_composio_client, get_heygen_connection_id
 
 
 class HeyGenGenerationError(RuntimeError):

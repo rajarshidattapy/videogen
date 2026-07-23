@@ -62,16 +62,21 @@ with st.sidebar:
     else:
         st.success("OpenAI API key loaded")
         st.success("Composio API key loaded")
+        st.success("Sarvam API key loaded")
         for label, value in [
             ("YouTube auth config", settings.youtube_auth_config_id),
             ("Twitter auth config", settings.twitter_auth_config_id),
             ("Exa auth config", settings.exa_auth_config_id),
-            ("ElevenLabs auth config", settings.elevenlabs_auth_config_id),
             ("HeyGen auth config", settings.heygen_auth_config_id),
         ]:
             (st.success if value else st.warning)(
                 f"{label}: {'configured' if value else 'using default connected account'}"
             )
+
+        if settings.public_base_url:
+            st.success(f"Public URL: {settings.public_base_url}")
+        else:
+            st.warning("PUBLIC_BASE_URL unset - audio works, video generation will fail")
 
     st.subheader("Provider")
     st.selectbox("LLM model", options=[settings.openai_model if settings else "gpt-4o"], disabled=True)
@@ -79,7 +84,7 @@ with st.sidebar:
     if settings:
         with st.expander("Advanced"):
             st.text(f"Composio user: {settings.composio_user_id}")
-            st.text(f"ElevenLabs voice: {settings.elevenlabs_voice_id}")
+            st.text(f"Sarvam voice: {settings.sarvam_speaker} ({settings.sarvam_model}, {settings.sarvam_language})")
             st.text(f"HeyGen avatar: {settings.heygen_avatar_id}")
 
 # --------------------------------------------------------------------------

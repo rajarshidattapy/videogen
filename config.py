@@ -24,27 +24,40 @@ class Settings(BaseSettings):
     youtube_auth_config_id: str | None = Field(default=None, validation_alias="YOUTUBE_AUTH_CONFIG_ID")
     twitter_auth_config_id: str | None = Field(default=None, validation_alias="TWITTER_AUTH_CONFIG_ID")
     exa_auth_config_id: str | None = Field(default=None, validation_alias="EXA_AUTH_CONFIG_ID")
-    elevenlabs_auth_config_id: str | None = Field(default=None, validation_alias="ELEVENLABS_AUTH_CONFIG_ID")
     heygen_auth_config_id: str | None = Field(default=None, validation_alias="HEYGEN_AUTH_CONFIG_ID")
 
-    # ElevenLabs
-    elevenlabs_voice_id: str = Field(default="EIsgvJT3rwoPvRFG6c4n", validation_alias="ELEVENLABS_VOICE_ID")
-    elevenlabs_model_id: str = Field(default="eleven_multilingual_v2", validation_alias="ELEVENLABS_MODEL_ID")
+    # Sarvam AI (text-to-speech, called directly - not via Composio)
+    sarvam_api_key: str = Field(validation_alias="SARVAM_API_KEY")
+    sarvam_model: str = Field(default="bulbul:v2", validation_alias="SARVAM_MODEL")
+    sarvam_speaker: str = Field(default="anushka", validation_alias="SARVAM_SPEAKER")
+    sarvam_language: str = Field(default="en-IN", validation_alias="SARVAM_LANGUAGE")
+
+    # Public origin of the deployed app (e.g. https://yourapp.streamlit.app). HeyGen
+    # fetches the generated audio over the internet, so it needs an absolute URL;
+    # leave empty locally, where only the video stage is affected.
+    public_base_url: str = Field(default="", validation_alias="PUBLIC_BASE_URL")
 
     # HeyGen
     heygen_avatar_id: str = Field(default="109cdee34a164003b0e847ffce93828e", validation_alias="HEYGEN_AVATAR_ID")
     heygen_polling_interval_seconds: int = Field(default=15, validation_alias="HEYGEN_POLLING_INTERVAL_SECONDS")
     heygen_max_polling_attempts: int = Field(default=60, validation_alias="HEYGEN_MAX_POLLING_ATTEMPTS")
 
-    # Storage
+    # Storage. Audio lands in static/ because Streamlit serves that folder over HTTP
+    # (see .streamlit/config.toml), which is how HeyGen gets a fetchable audio URL.
     output_dir: Path = BASE_DIR / "outputs"
-    audio_output_dir: Path = BASE_DIR / "outputs" / "audio"
+    static_dir: Path = BASE_DIR / "static"
     video_output_dir: Path = BASE_DIR / "outputs" / "videos"
     log_dir: Path = BASE_DIR / "logs"
 
     def ensure_output_dirs(self) -> None:
-        for directory in (self.output_dir, self.audio_output_dir, self.video_output_dir, self.log_dir):
+        for directory in (self.output_dir, self.static_dir, self.video_output_dir, self.log_dir):
             directory.mkdir(parents=True, exist_ok=True)
+
+    def static_file_url(self, filename: str) -> str:
+        """Absolute URL for a file in static/, or "" when PUBLIC_BASE_URL is unset."""
+        if not self.public_base_url:
+            return ""
+        return f"{self.public_base_url.rstrip('/')}/app/static/{filename}"
 
 
 _settings: Settings | None = None

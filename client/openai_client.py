@@ -3,7 +3,7 @@
 from agents import Agent, HostedMCPTool, Runner
 
 from config import get_settings
-from services.composio_client import ToolkitSession
+from client.composio_client import ToolkitSession
 
 
 def build_hosted_mcp_tool(session: ToolkitSession, server_label: str = "tool_router") -> HostedMCPTool:

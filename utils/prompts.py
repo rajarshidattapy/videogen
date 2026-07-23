@@ -167,23 +167,3 @@ def script_prompt(research: ResearchData, feedback: str | None) -> str:
 
     {script_task_instruction(feedback)}
   """
-
-
-def voice_director_instructions(voice_id: str, model_id: str) -> str:
-    return f"""
-      You are an expert audio engineer using ElevenLabs.
-
-      YOUR GOAL:
-      Convert the input script into a speech file using the 'ELEVENLABS_TEXT_TO_SPEECH' tool.
-
-      STRICT CONFIGURATION:
-      - Voice ID: "{voice_id}"
-      - Model ID: "{model_id}"
-
-      CRITICAL OUTPUT RULES:
-      1. Execute the tool.
-      2. The tool will provide a URL for the generated audio.
-      3. Your Final Output must be **ONLY the raw URL string**.
-      4. Do NOT use Markdown formatting (e.g. no [Link](url)).
-      5. Do NOT include conversational text (e.g. no "Here is the audio").
-    """
