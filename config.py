@@ -81,4 +81,11 @@ def reload_settings() -> Settings:
     """
     global _settings
     _settings = None
+
+    # Drop the cached Composio client + shared MCP session too, so a re-keyed .env
+    # doesn't leave the research pipeline on the old session. Imported lazily -
+    # composio_client imports this module.
+    from client.composio_client import reset_session_cache
+
+    reset_session_cache()
     return get_settings()

@@ -7,7 +7,7 @@ from typing import Any
 import requests
 
 from config import get_settings
-from client.composio_client import get_composio_client, get_heygen_connection_id
+from client.composio_client import get_client
 
 
 class HeyGenGenerationError(RuntimeError):
@@ -18,8 +18,29 @@ class HeyGenTimeoutError(RuntimeError):
     pass
 
 
+def get_heygen_connection_id(toolkit_slug: str = "HEYGEN") -> str:
+    """Newest ACTIVE HeyGen connection id for the configured Composio user.
+
+    Lives here, not in composio_client, because the proxy flow below is the only
+    caller - the shared session module is just the client + research MCP session.
+    """
+    settings = get_settings()
+    connections = get_client().connected_accounts.list(
+        user_ids=[settings.composio_user_id],
+        statuses=["ACTIVE"],
+    )
+    for item in sorted(connections.items, key=lambda c: c.created_at, reverse=True):
+        if item.toolkit.slug.lower() == toolkit_slug.lower():
+            return item.id
+
+    raise RuntimeError(
+        f"No active connection found for {toolkit_slug}. "
+        f"Please authenticate User: {settings.composio_user_id}"
+    )
+
+
 def _start_generation(audio_url: str, connection_id: str, avatar_id: str) -> str:
-    composio = get_composio_client()
+    composio = get_client()
 
     payload: dict[str, Any] = {
         "test": False,
@@ -61,7 +82,7 @@ def _start_generation(audio_url: str, connection_id: str, avatar_id: str) -> str
 
 
 def _poll_status(video_id: str, connection_id: str, interval_seconds: int, max_attempts: int) -> str:
-    composio = get_composio_client()
+    composio = get_client()
 
     for _attempt in range(max_attempts):
         response = composio.tools.proxy(

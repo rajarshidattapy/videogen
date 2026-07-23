@@ -6,7 +6,7 @@ your own OAuth app, and Exa/HeyGen authenticate with a plain API key.
 
 from dataclasses import dataclass
 
-from client.composio_client import get_composio_client
+from client.composio_client import get_client
 from config import get_settings
 
 
@@ -28,13 +28,13 @@ TOOLKITS = (
 
 def connected_slugs() -> set[str]:
     """Slugs with an ACTIVE connection for the configured Composio user."""
-    client = get_composio_client()
+    client = get_client()
     accounts = client.connected_accounts.list(user_ids=[get_settings().composio_user_id])
     return {a.toolkit.slug.lower() for a in accounts.items if str(a.status).upper() == "ACTIVE"}
 
 
 def _existing_auth_config(slug: str) -> str | None:
-    client = get_composio_client()
+    client = get_client()
     for config in client.auth_configs.list().items:
         if config.toolkit.slug.lower() == slug.lower():
             return config.id
@@ -47,7 +47,7 @@ def ensure_auth_config(toolkit: Toolkit, client_id: str = "", client_secret: str
     if existing:
         return existing
 
-    client = get_composio_client()
+    client = get_client()
     if toolkit.scheme == "oauth_managed":
         options = {"type": "use_composio_managed_auth"}
     elif toolkit.scheme == "oauth_custom":
@@ -79,7 +79,7 @@ def start_connection(
         raise ValueError(f"{toolkit.label} needs an API key.")
 
     auth_config_id = ensure_auth_config(toolkit, client_id, client_secret)
-    client = get_composio_client()
+    client = get_client()
     user_id = get_settings().composio_user_id
 
     # Composio-managed OAuth has to go through link(); initiate() was retired for it.

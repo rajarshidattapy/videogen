@@ -54,9 +54,9 @@ def run_stage_safely(stage_name: str, fn, *args) -> object | None:
 def check_composio() -> tuple[bool, str]:
     """Live credential check, cached for 5 minutes. Research and video both need this."""
     try:
-        from client.composio_client import get_composio_client
+        from client.composio_client import get_client
 
-        client = get_composio_client()
+        client = get_client()
         accounts = client.connected_accounts.list(user_ids=[get_settings().composio_user_id])
         slugs = sorted({item.toolkit.slug.upper() for item in accounts.items})
         if not slugs:
