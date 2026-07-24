@@ -1,2 +1,0 @@
-"""Talking-head generation stages."""
-
