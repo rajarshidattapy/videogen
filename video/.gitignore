@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+data/
+assets/reference/
+assets/drivers/*.pkl
+work/
+out/
+vendor/
+
