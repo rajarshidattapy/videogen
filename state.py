@@ -60,6 +60,7 @@ class PipelineState(BaseModel):
     audio_url: str | None = None
     audio_path: str | None = None
     video_path: str | None = None
+    video_attempts: int = 0
     status: PipelineStatus = PipelineStatus.IDLE
     errors: list[str] = Field(default_factory=list)
 

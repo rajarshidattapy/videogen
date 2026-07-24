@@ -5,12 +5,19 @@ All business logic lives in stages/ and client/.
 """
 
 import os
+from pathlib import Path
 
 import streamlit as st
+from dotenv import load_dotenv
 
-# On Streamlit Community Cloud, secrets are configured in the dashboard and read via
-# st.secrets. Bridge them into os.environ so config.py (plain env-var based) behaves
-# identically locally (.env) and when deployed.
+# Config precedence: .env (local) wins, then st.secrets (production) fills the rest.
+#
+# Loading .env into os.environ FIRST matters: the secrets bridge below uses
+# setdefault, so anything .env already defined is left alone. Locally that means
+# .env governs; on Streamlit Cloud there is no .env, so the dashboard secrets
+# supply everything. Same code, two environments, no overrides fighting.
+load_dotenv(Path(__file__).parent / ".env")  # explicit path - never cwd-dependent
+
 try:
     for _key, _value in st.secrets.items():
         if isinstance(_value, str):
@@ -91,6 +98,12 @@ if settings_error:
 else:
     composio_ok, composio_msg = check_composio()
 
+# Public deployment: no admin surface. Any visitor uses the pipeline on the owner's
+# pre-configured keys; the Settings & connections panel is hidden entirely.
+public_mode = bool(settings and settings.public_mode)
+if public_mode:
+    st.session_state.view = "studio"
+
 if "view" not in st.session_state:
     st.session_state.view = "studio"
 
@@ -100,17 +113,18 @@ if "view" not in st.session_state:
 with st.sidebar:
     st.header("🎬 AI Video Studio")
 
-    if st.session_state.view == "studio":
-        if st.button("⚙️ Settings & connections", use_container_width=True):
-            st.session_state.view = "settings"
-            st.rerun()
-    else:
-        if st.button("← Back to studio", use_container_width=True):
-            st.session_state.view = "studio"
-            st.rerun()
+    if not public_mode:
+        if st.session_state.view == "studio":
+            if st.button("⚙️ Settings & connections", use_container_width=True):
+                st.session_state.view = "settings"
+                st.rerun()
+        else:
+            if st.button("← Back to studio", use_container_width=True):
+                st.session_state.view = "studio"
+                st.rerun()
 
-    if not composio_ok and st.session_state.view == "studio":
-        st.warning("Composio not ready - open Settings.")
+        if not composio_ok and st.session_state.view == "studio":
+            st.warning("Composio not ready - open Settings.")
 
     if st.button("Reset pipeline", use_container_width=True):
         st.session_state.pipeline = PipelineState()
@@ -118,9 +132,9 @@ with st.sidebar:
         st.rerun()
 
 # --------------------------------------------------------------------------
-# Settings view - service status + connections, on its own screen
+# Settings view - service status + connections, on its own screen (hidden in public mode)
 # --------------------------------------------------------------------------
-if st.session_state.view == "settings":
+if st.session_state.view == "settings" and not public_mode:
     st.title("⚙️ Settings & connections")
 
     st.subheader("Service status")
@@ -275,10 +289,13 @@ with st.container(border=True):
         st.rerun()
 
     if research_blocker:
-        st.info(
-            "No research source yet - connect YouTube/Exa or set Twitter/Reddit credentials "
-            "under ⚙️ Settings. You can still skip ahead and write a script by hand in step 2."
-        )
+        if public_mode:
+            st.info("Automated research is unavailable right now - write a script by hand in step 2.")
+        else:
+            st.info(
+                "No research source yet - connect YouTube/Exa or set Twitter/Reddit credentials "
+                "under ⚙️ Settings. You can still skip ahead and write a script by hand in step 2."
+            )
 
     if state.research:
         st.markdown("**AI summary / news**")
@@ -422,14 +439,23 @@ with st.container(border=True):
 # 5. Video
 # --------------------------------------------------------------------------
 with st.container(border=True):
+    max_attempts = settings.max_video_attempts if settings else 2
+    attempts_left = max_attempts - state.video_attempts
+
     blocker = video_blocker or (None if state.audio_path else "Generate the voiceover first.")
+    if attempts_left <= 0 and not blocker:
+        blocker = f"Video attempt limit reached ({max_attempts}). Reset the pipeline to start over."
+
     stage_header(5, "Video", state.video_path is not None, state.status == PipelineStatus.GENERATING_VIDEO, blocker)
     st.caption("HeyGen avatar video. Only works on the deployed app.")
 
     if blocker:
         st.info(blocker)
+    elif state.audio_path:
+        st.caption(f"Attempts left: {attempts_left} of {max_attempts}")
 
     if st.button("Generate video", type="primary", disabled=bool(blocker)):
+        state.video_attempts += 1
         state.status = PipelineStatus.GENERATING_VIDEO
         st.warning("HeyGen renders can take several minutes. Leave this tab open.")
         result = run_stage_safely("Video", run_video_stage, state.audio_url)

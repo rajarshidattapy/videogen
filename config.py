@@ -47,10 +47,20 @@ class Settings(BaseSettings):
     # leave empty locally, where only the video stage is affected.
     public_base_url: str = Field(default="", validation_alias="PUBLIC_BASE_URL")
 
+    # Public deployment: hide the Settings & connections admin panel so any visitor
+    # can just use the pipeline on the owner's pre-configured keys, without being
+    # able to touch credentials. Set PUBLIC_MODE=true in the deployed secrets; leave
+    # unset locally to manage connections.
+    public_mode: bool = Field(default=False, validation_alias="PUBLIC_MODE")
+
     # HeyGen
     heygen_avatar_id: str = Field(default="109cdee34a164003b0e847ffce93828e", validation_alias="HEYGEN_AVATAR_ID")
     heygen_polling_interval_seconds: int = Field(default=15, validation_alias="HEYGEN_POLLING_INTERVAL_SECONDS")
     heygen_max_polling_attempts: int = Field(default=60, validation_alias="HEYGEN_MAX_POLLING_ATTEMPTS")
+
+    # Per-session cap on video generations (each HeyGen render costs). After this
+    # many attempts the Generate video button is disabled.
+    max_video_attempts: int = Field(default=2, validation_alias="MAX_VIDEO_ATTEMPTS")
 
     # Storage. Audio lands in static/ because Streamlit serves that folder over HTTP
     # (see .streamlit/config.toml), which is how HeyGen gets a fetchable audio URL.
