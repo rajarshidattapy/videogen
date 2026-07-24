@@ -18,9 +18,11 @@ class Toolkit:
     hint: str
 
 
+# Twitter/X is intentionally absent - it uses twscrape, not Composio (see
+# client/twitter_client.py). Reddit uses PRAW. Both are configured via env vars,
+# not this OAuth/API-key connection flow.
 TOOLKITS = (
     Toolkit("youtube", "YouTube", "oauth_managed", "One click - Composio provides the OAuth app."),
-    Toolkit("twitter", "Twitter/X", "oauth_custom", "Needs a client ID/secret from developer.x.com."),
     Toolkit("exa", "Exa", "api_key", "Paste your Exa API key from dashboard.exa.ai."),
     Toolkit("heygen", "HeyGen", "api_key", "Paste your HeyGen API key from app.heygen.com."),
 )

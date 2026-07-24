@@ -22,11 +22,20 @@ class TwitterInsight(BaseModel):
     views: int
 
 
+class RedditPost(BaseModel):
+    title: str
+    url: str
+    score: int
+    comments: int
+    subreddit: str = ""
+
+
 class ResearchData(BaseModel):
     videos: list[VideoReference] = Field(default_factory=list)
     raw_transcripts: str = ""
     trends: str = ""
     twitter_insights: list[TwitterInsight] = Field(default_factory=list)
+    reddit_posts: list[RedditPost] = Field(default_factory=list)
 
 
 class PipelineStatus(StrEnum):

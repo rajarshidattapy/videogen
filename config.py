@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     exa_auth_config_id: str | None = Field(default=None, validation_alias="EXA_AUTH_CONFIG_ID")
     heygen_auth_config_id: str | None = Field(default=None, validation_alias="HEYGEN_AUTH_CONFIG_ID")
 
+    # Twitter/X via twscrape (direct scraping, NOT Composio). Needs a logged-in
+    # account's cookies: "auth_token=...; ct0=...". Empty -> Twitter is skipped.
+    twitter_cookies: str = Field(default="", validation_alias="TWITTER_COOKIES")
+
+    # Reddit via PRAW (read-only). Empty id/secret -> Reddit is skipped.
+    reddit_client_id: str = Field(default="", validation_alias="REDDIT_CLIENT_ID")
+    reddit_client_secret: str = Field(default="", validation_alias="REDDIT_CLIENT_SECRET")
+    reddit_user_agent: str = Field(default="videogen-research/1.0", validation_alias="REDDIT_USER_AGENT")
+
     # Sarvam AI (text-to-speech, called directly - not via Composio)
     sarvam_api_key: str = Field(min_length=1, validation_alias="SARVAM_API_KEY")
     sarvam_model: str = Field(default="bulbul:v2", validation_alias="SARVAM_MODEL")
@@ -48,6 +57,7 @@ class Settings(BaseSettings):
     output_dir: Path = BASE_DIR / "outputs"
     static_dir: Path = BASE_DIR / "static"
     video_output_dir: Path = BASE_DIR / "outputs" / "videos"
+    twscrape_db: Path = BASE_DIR / "outputs" / "accounts.db"  # twscrape session store
     log_dir: Path = BASE_DIR / "logs"
 
     def ensure_output_dirs(self) -> None:

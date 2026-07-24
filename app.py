@@ -129,7 +129,17 @@ if st.session_state.view == "settings":
     else:
         st.success("OpenAI - key loaded")
         st.success("Sarvam - key loaded")
-        (st.success if composio_ok else st.error)(f"Composio - {composio_msg}")
+        (st.success if composio_ok else st.error)(f"Composio (YouTube/Exa) - {composio_msg}")
+
+        from client.reddit_client import reddit_available
+        from client.twitter_client import twitter_available
+
+        (st.success if twitter_available() else st.warning)(
+            "Twitter/X (twscrape) - " + ("cookies set" if twitter_available() else "TWITTER_COOKIES unset - skipped")
+        )
+        (st.success if reddit_available() else st.warning)(
+            "Reddit (PRAW) - " + ("credentials set" if reddit_available() else "REDDIT_CLIENT_ID/SECRET unset - skipped")
+        )
 
         if settings.public_base_url:
             st.success(f"Public URL - {settings.public_base_url}")
@@ -203,7 +213,21 @@ if st.session_state.view == "settings":
 # --------------------------------------------------------------------------
 # Blockers, computed once and reused by each stage (studio view)
 # --------------------------------------------------------------------------
-research_blocker = None if composio_ok else composio_msg
+# Research runs on any available source: Composio (YouTube/Exa), Twitter, or Reddit.
+if settings_error:
+    any_research_source = False
+else:
+    from client.reddit_client import reddit_available
+    from client.twitter_client import twitter_available
+
+    any_research_source = composio_ok or twitter_available() or reddit_available()
+
+research_blocker = (
+    None
+    if any_research_source
+    else "No research source - connect YouTube/Exa, or set Twitter/Reddit credentials (⚙️ Settings)."
+)
+
 video_blocker = None
 if not composio_ok:
     video_blocker = composio_msg
@@ -237,7 +261,7 @@ if state.errors:
 # --------------------------------------------------------------------------
 with st.container(border=True):
     stage_header(1, "Research", bool(state.research), state.status == PipelineStatus.RESEARCHING, research_blocker)
-    st.caption("YouTube, Twitter/X, and Exa via Composio.")
+    st.caption("YouTube + Exa via Composio; Twitter/X via twscrape; Reddit via PRAW.")
 
     topic = st.text_input("Topic", value=state.topic or "Claude code for development in 2026")
 
@@ -252,8 +276,8 @@ with st.container(border=True):
 
     if research_blocker:
         st.info(
-            "Research needs Composio - connect toolkits under ⚙️ Settings & connections. "
-            "You can still skip ahead and write a script by hand in step 2."
+            "No research source yet - connect YouTube/Exa or set Twitter/Reddit credentials "
+            "under ⚙️ Settings. You can still skip ahead and write a script by hand in step 2."
         )
 
     if state.research:
@@ -269,6 +293,11 @@ with st.container(border=True):
             st.markdown("**Twitter/X insights**")
             for tweet in state.research.twitter_insights:
                 st.markdown(f"- {tweet.text} ({tweet.likes} likes) - [link]({tweet.url})")
+
+        if state.research.reddit_posts:
+            st.markdown("**Reddit discussions**")
+            for post in state.research.reddit_posts:
+                st.markdown(f"- [{post.title}]({post.url}) ({post.score} pts, r/{post.subreddit})")
 
 # --------------------------------------------------------------------------
 # 2. Script

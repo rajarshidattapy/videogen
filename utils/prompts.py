@@ -39,47 +39,6 @@ def trend_researcher_instructions(topic: str, date_str: str) -> str:
     """
 
 
-def twitter_scout_instructions(search_query: str, date_str: str) -> str:
-    return f"""
-      You are a Twitter researcher finding VIRAL content.
-
-      STEP 1 - SEARCH TWITTER:
-      Search for: "{search_query}"
-
-      Use the Twitter search tool with these parameters:
-      - query: "{search_query}" (use this EXACT query, do NOT modify it)
-      - max_results: 10 (keep data manageable for the agent)
-      - sort_order: "relevancy" (prioritize popular/engaging tweets)
-
-      STEP 2 - FILTER RESULTS:
-      From the search results, ONLY include tweets that have:
-      - 100+ likes (like_count >= 100)
-      - 5+ comments/replies (reply_count >= 5)
-      - Posted within the last 90 days (after {date_str})
-
-      If no tweets meet these criteria, lower the threshold slightly but prioritize the most engaged tweets.
-
-      STEP 3 - RETURN TOP 5:
-      Return the TOP 5 most viral tweets based on engagement.
-
-      CRITICAL OUTPUT INSTRUCTIONS:
-      - Return ONLY valid JSON array.
-      - No markdown formatting. No text before or after.
-      - Schema MUST be exactly:
-        [
-          {{
-            "text": "tweet content here",
-            "url": "https://twitter.com/user/status/id",
-            "likes": 150,
-            "comments": 10,
-            "views": 5000
-          }}
-        ]
-
-      If you find tweets, return them. If the API returns tweets that don't meet the engagement criteria, still return the best ones available with their actual metrics.
-    """
-
-
 SCRIPTWRITER_AGENT_INSTRUCTIONS = (
     "You are an expert short-form scriptwriter. You hate fluff. You love specific facts."
 )
@@ -120,6 +79,13 @@ def script_source_material(research: ResearchData) -> str:
         )
         or "No Twitter data available."
     )
+    reddit_context = (
+        "\n".join(
+            f'- Discussion: "{p.title}" (Score: {p.score}, r/{p.subreddit})'
+            for p in research.reddit_posts[:5]
+        )
+        or "No Reddit data available."
+    )
 
     return f"""
     SOURCE MATERIAL:
@@ -131,6 +97,10 @@ def script_source_material(research: ResearchData) -> str:
     [PUBLIC SENTIMENT FROM TWITTER]
     Use these to match the emotional tone or address controversy:
     {twitter_context}
+
+    [COMMUNITY DISCUSSION FROM REDDIT]
+    Use these to see what people actually argue about and care about:
+    {reddit_context}
 
     [CORE FACTS & NEWS]
     Use these facts for the body of the script:

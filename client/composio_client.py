@@ -13,8 +13,9 @@ from composio_openai_agents import OpenAIAgentsProvider
 
 from config import get_settings
 
-# The whole research pipeline runs on one session over these toolkits.
-RESEARCH_TOOLKITS = ["youtube", "exa", "twitter"]
+# Composio-brokered research toolkits. Twitter/X and Reddit are NOT here - they
+# use twscrape / PRAW directly (client/twitter_client.py, client/reddit_client.py).
+RESEARCH_TOOLKITS = ["youtube", "exa"]
 
 _client: Composio | None = None
 _session = None  # ToolRouterSession, cached for the process
